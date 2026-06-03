@@ -166,7 +166,7 @@ export function MapleApp() {
                         : "bg-secondary text-secondary-foreground rounded-bl-md"
                     }`}
                   >
-                    <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-headings:my-1 prose-strong:text-current">
+                    <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-headings:my-1 prose-strong:text-current [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_li]:pl-1">
                       <ReactMarkdown>{m.content}</ReactMarkdown>
                     </div>
                   </div>
