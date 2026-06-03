@@ -4,10 +4,41 @@ import ReactMarkdown from "react-markdown";
 import { chatWithMaple } from "@/lib/ai/chat.functions";
 
 type Message = { role: "user" | "assistant"; content: string };
-type Bucket = "7d" | "30d" | "custom";
+type Bucket = "7d" | "14d" | "30d" | "custom";
 type Task = { id: string; title: string; done: boolean; bucket: Bucket; note?: string };
 
 const STORAGE_KEY = "maple.state.v1";
+
+// Parse an assistant markdown reply for "### Heading" + "- bullet" pairs.
+// Returns flat list of {title, note} items skipping meta sections like
+// "A couple of quick questions", "Next step", "Want this as a checklist".
+const META_HEADINGS = /quick questions|next step|want this as a checklist|clarifying/i;
+function extractChecklistItems(md: string): { title: string; note?: string }[] {
+  const lines = md.split(/\r?\n/);
+  const items: { title: string; note?: string }[] = [];
+  let currentHeading = "";
+  let skip = false;
+  for (const raw of lines) {
+    const line = raw.trim();
+    const h = line.match(/^#{2,4}\s+(.+?)\s*$/);
+    if (h) {
+      currentHeading = h[1].replace(/\*\*/g, "").trim();
+      skip = META_HEADINGS.test(currentHeading);
+      continue;
+    }
+    if (skip) continue;
+    const b = line.match(/^[-*]\s+(.+)$/);
+    if (b) {
+      const text = b[1].replace(/\*\*/g, "").trim();
+      if (!text || /^yes\b/i.test(text)) continue;
+      items.push({ title: text, note: currentHeading || undefined });
+    }
+  }
+  return items;
+}
+function hasChecklistContent(md: string): boolean {
+  return extractChecklistItems(md).length >= 2;
+}
 
 const STARTERS = [
   "I just landed in Toronto. What do I do first?",
