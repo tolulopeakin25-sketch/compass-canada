@@ -137,6 +137,27 @@ export function MapleApp() {
     setTasks((ts) => [...ts, { id: crypto.randomUUID(), title: t, done: false, bucket }]);
   };
 
+  const addTasksBulk = (items: { title: string; note?: string }[], bucket: Bucket) => {
+    const clean = items
+      .map((i) => ({ title: i.title.trim(), note: i.note?.trim() }))
+      .filter((i) => i.title.length > 0);
+    if (!clean.length) return;
+    setTasks((ts) => {
+      const existing = new Set(ts.map((t) => t.title.toLowerCase()));
+      const fresh = clean
+        .filter((i) => !existing.has(i.title.toLowerCase()))
+        .map((i) => ({
+          id: crypto.randomUUID(),
+          title: i.title,
+          note: i.note,
+          done: false,
+          bucket,
+        }));
+      return [...ts, ...fresh];
+    });
+    setTab("plan");
+  };
+
   const done = tasks.filter((t) => t.done).length;
 
   return (
@@ -185,24 +206,33 @@ export function MapleApp() {
           {/* Body */}
           {tab === "chat" ? (
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-              {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-                >
+              {messages.map((m, i) => {
+                const showSave = m.role === "assistant" && hasChecklistContent(m.content);
+                return (
                   <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                      m.role === "user"
-                        ? "bg-primary text-primary-foreground rounded-br-md"
-                        : "bg-secondary text-secondary-foreground rounded-bl-md"
-                    }`}
+                    key={i}
+                    className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}
                   >
-                    <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-headings:my-2 prose-strong:text-current [&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_li]:pl-1">
-                      <ReactMarkdown>{m.content}</ReactMarkdown>
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                        m.role === "user"
+                          ? "bg-primary text-primary-foreground rounded-br-md"
+                          : "bg-secondary text-secondary-foreground rounded-bl-md"
+                      }`}
+                    >
+                      <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-headings:my-2 prose-strong:text-current [&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_li]:pl-1">
+                        <ReactMarkdown>{m.content}</ReactMarkdown>
+                      </div>
                     </div>
+                    {showSave && (
+                      <SaveChecklist
+                        items={extractChecklistItems(m.content)}
+                        onSave={addTasksBulk}
+                      />
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {loading && (
                 <div className="flex justify-start">
                   <div className="bg-secondary rounded-2xl rounded-bl-md px-4 py-3">
