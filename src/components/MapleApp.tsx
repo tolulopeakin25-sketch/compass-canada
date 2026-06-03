@@ -4,10 +4,41 @@ import ReactMarkdown from "react-markdown";
 import { chatWithMaple } from "@/lib/ai/chat.functions";
 
 type Message = { role: "user" | "assistant"; content: string };
-type Bucket = "7d" | "30d" | "custom";
+type Bucket = "7d" | "14d" | "30d" | "custom";
 type Task = { id: string; title: string; done: boolean; bucket: Bucket; note?: string };
 
 const STORAGE_KEY = "maple.state.v1";
+
+// Parse an assistant markdown reply for "### Heading" + "- bullet" pairs.
+// Returns flat list of {title, note} items skipping meta sections like
+// "A couple of quick questions", "Next step", "Want this as a checklist".
+const META_HEADINGS = /quick questions|next step|want this as a checklist|clarifying/i;
+function extractChecklistItems(md: string): { title: string; note?: string }[] {
+  const lines = md.split(/\r?\n/);
+  const items: { title: string; note?: string }[] = [];
+  let currentHeading = "";
+  let skip = false;
+  for (const raw of lines) {
+    const line = raw.trim();
+    const h = line.match(/^#{2,4}\s+(.+?)\s*$/);
+    if (h) {
+      currentHeading = h[1].replace(/\*\*/g, "").trim();
+      skip = META_HEADINGS.test(currentHeading);
+      continue;
+    }
+    if (skip) continue;
+    const b = line.match(/^[-*]\s+(.+)$/);
+    if (b) {
+      const text = b[1].replace(/\*\*/g, "").trim();
+      if (!text || /^yes\b/i.test(text)) continue;
+      items.push({ title: text, note: currentHeading || undefined });
+    }
+  }
+  return items;
+}
+function hasChecklistContent(md: string): boolean {
+  return extractChecklistItems(md).length >= 2;
+}
 
 const STARTERS = [
   "I just landed in Toronto. What do I do first?",
@@ -106,6 +137,27 @@ export function MapleApp() {
     setTasks((ts) => [...ts, { id: crypto.randomUUID(), title: t, done: false, bucket }]);
   };
 
+  const addTasksBulk = (items: { title: string; note?: string }[], bucket: Bucket) => {
+    const clean = items
+      .map((i) => ({ title: i.title.trim(), note: i.note?.trim() }))
+      .filter((i) => i.title.length > 0);
+    if (!clean.length) return;
+    setTasks((ts) => {
+      const existing = new Set(ts.map((t) => t.title.toLowerCase()));
+      const fresh = clean
+        .filter((i) => !existing.has(i.title.toLowerCase()))
+        .map((i) => ({
+          id: crypto.randomUUID(),
+          title: i.title,
+          note: i.note,
+          done: false,
+          bucket,
+        }));
+      return [...ts, ...fresh];
+    });
+    setTab("plan");
+  };
+
   const done = tasks.filter((t) => t.done).length;
 
   return (
@@ -154,24 +206,33 @@ export function MapleApp() {
           {/* Body */}
           {tab === "chat" ? (
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-              {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-                >
+              {messages.map((m, i) => {
+                const showSave = m.role === "assistant" && hasChecklistContent(m.content);
+                return (
                   <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                      m.role === "user"
-                        ? "bg-primary text-primary-foreground rounded-br-md"
-                        : "bg-secondary text-secondary-foreground rounded-bl-md"
-                    }`}
+                    key={i}
+                    className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}
                   >
-                    <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-headings:my-2 prose-strong:text-current [&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_li]:pl-1">
-                      <ReactMarkdown>{m.content}</ReactMarkdown>
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                        m.role === "user"
+                          ? "bg-primary text-primary-foreground rounded-br-md"
+                          : "bg-secondary text-secondary-foreground rounded-bl-md"
+                      }`}
+                    >
+                      <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-headings:my-2 prose-strong:text-current [&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_li]:pl-1">
+                        <ReactMarkdown>{m.content}</ReactMarkdown>
+                      </div>
                     </div>
+                    {showSave && (
+                      <SaveChecklist
+                        items={extractChecklistItems(m.content)}
+                        onSave={addTasksBulk}
+                      />
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {loading && (
                 <div className="flex justify-start">
                   <div className="bg-secondary rounded-2xl rounded-bl-md px-4 py-3">
@@ -272,6 +333,64 @@ function AddTask({ onAdd }: { onAdd: (title: string) => void }) {
   );
 }
 
+function SaveChecklist({
+  items,
+  onSave,
+}: {
+  items: { title: string; note?: string }[];
+  onSave: (items: { title: string; note?: string }[], bucket: Bucket) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [saved, setSaved] = useState<Bucket | null>(null);
+  const options: { key: Bucket; label: string }[] = [
+    { key: "7d", label: "7-day" },
+    { key: "14d", label: "2-week" },
+    { key: "30d", label: "30-day" },
+    { key: "custom", label: "Custom list" },
+  ];
+  if (saved) {
+    return (
+      <p className="text-[11px] text-muted-foreground mt-1 px-1">
+        Saved {items.length} steps to your Plan ✓
+      </p>
+    );
+  }
+  return (
+    <div className="mt-1.5 px-1 max-w-[85%]">
+      {!open ? (
+        <button
+          onClick={() => setOpen(true)}
+          className="text-xs px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors"
+        >
+          + Save as checklist ({items.length} steps)
+        </button>
+      ) : (
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <span className="text-[11px] text-muted-foreground">Save as:</span>
+          {options.map((o) => (
+            <button
+              key={o.key}
+              onClick={() => {
+                onSave(items, o.key);
+                setSaved(o.key);
+              }}
+              className="text-[11px] px-2.5 py-1 rounded-full border border-border bg-card hover:border-primary/40 text-foreground"
+            >
+              {o.label}
+            </button>
+          ))}
+          <button
+            onClick={() => setOpen(false)}
+            className="text-[11px] px-2 py-1 text-muted-foreground hover:text-foreground"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PlanView({
   scrollRef,
   tasks,
@@ -287,6 +406,7 @@ function PlanView({
 
   const sections: { key: Bucket; label: string; sub: string }[] = [
     { key: "7d", label: "First 7 days", sub: "Arrival essentials" },
+    { key: "14d", label: "First 2 weeks", sub: "Getting set up" },
     { key: "30d", label: "First 30 days", sub: "Settling in" },
     { key: "custom", label: "Your own", sub: "Anything you've added" },
   ];
