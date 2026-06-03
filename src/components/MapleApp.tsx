@@ -4,7 +4,8 @@ import ReactMarkdown from "react-markdown";
 import { chatWithMaple } from "@/lib/ai/chat.functions";
 
 type Message = { role: "user" | "assistant"; content: string };
-type Task = { id: string; title: string; done: boolean; due?: string };
+type Bucket = "7d" | "30d" | "custom";
+type Task = { id: string; title: string; done: boolean; bucket: Bucket; note?: string };
 
 const STORAGE_KEY = "maple.state.v1";
 
@@ -16,10 +17,24 @@ const STARTERS = [
 ];
 
 const INITIAL_TASKS: Task[] = [
-  { id: "t1", title: "Apply for SIN at Service Canada", done: false, due: "Week 1" },
-  { id: "t2", title: "Open a student bank account", done: false, due: "Week 1" },
-  { id: "t3", title: "Register for provincial health card", done: false, due: "Week 2" },
-  { id: "t4", title: "Get a SIM / phone plan", done: false, due: "Week 1" },
+  // First 7 days — arrival essentials
+  { id: "d1", bucket: "7d", done: false, title: "Apply for a SIN at Service Canada", note: "Bring passport + study permit" },
+  { id: "d2", bucket: "7d", done: false, title: "Open a student bank account", note: "Most big banks waive fees for students" },
+  { id: "d3", bucket: "7d", done: false, title: "Get a Canadian SIM / phone plan", note: "Prepaid is fine for week one" },
+  { id: "d4", bucket: "7d", done: false, title: "Confirm housing & get keys", note: "Take photos of any damage on day one" },
+  { id: "d5", bucket: "7d", done: false, title: "Buy a transit pass (student fare)", note: "Presto / Compass / OPUS depending on city" },
+  { id: "d6", bucket: "7d", done: false, title: "Stock the kitchen & basics", note: "Grocery run + bedding + adapter" },
+  { id: "d7", bucket: "7d", done: false, title: "Save emergency contacts", note: "School int'l office, 911, embassy" },
+
+  // First 30 days — settling in
+  { id: "m1", bucket: "30d", done: false, title: "Register for the provincial health card", note: "OHIP / RAMQ / MSP — check the wait period" },
+  { id: "m2", bucket: "30d", done: false, title: "Complete on-campus enrolment & orientation", note: "Pick up student ID" },
+  { id: "m3", bucket: "30d", done: false, title: "Set up a credit card to build credit", note: "Student card with no income check" },
+  { id: "m4", bucket: "30d", done: false, title: "Find a family doctor or walk-in clinic", note: "Know where to go before you need it" },
+  { id: "m5", bucket: "30d", done: false, title: "Learn your study permit work rules", note: "On/off-campus hours per IRCC" },
+  { id: "m6", bucket: "30d", done: false, title: "Build a weekly budget", note: "Rent, groceries, transit, phone, savings" },
+  { id: "m7", bucket: "30d", done: false, title: "Join 1 student club or community group", note: "Fastest way to make friends" },
+  { id: "m8", bucket: "30d", done: false, title: "Set up tenant insurance", note: "Usually under $20/month" },
 ];
 
 export function MapleApp() {
@@ -85,10 +100,10 @@ export function MapleApp() {
   const toggleTask = (id: string) =>
     setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
 
-  const addTask = (title: string) => {
+  const addTask = (title: string, bucket: Bucket = "custom") => {
     const t = title.trim();
     if (!t) return;
-    setTasks((ts) => [...ts, { id: crypto.randomUUID(), title: t, done: false }]);
+    setTasks((ts) => [...ts, { id: crypto.randomUUID(), title: t, done: false, bucket }]);
   };
 
   const done = tasks.filter((t) => t.done).length;
@@ -184,47 +199,12 @@ export function MapleApp() {
               )}
             </div>
           ) : (
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground px-1">
-                Your settlement plan
-              </p>
-              {tasks.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => toggleTask(t.id)}
-                  className="w-full flex items-start gap-3 p-3 rounded-xl border border-border bg-card hover:border-primary/40 transition-colors text-left"
-                >
-                  <span
-                    className={`mt-0.5 h-5 w-5 rounded-md border-2 grid place-items-center shrink-0 ${
-                      t.done ? "bg-primary border-primary text-primary-foreground" : "border-border"
-                    }`}
-                  >
-                    {t.done && (
-                      <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
-                        <path
-                          fillRule="evenodd"
-                          d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0L3.3 9.7a1 1 0 011.4-1.4l3.8 3.8 6.8-6.8a1 1 0 011.4 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    )}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div
-                      className={`text-sm ${
-                        t.done ? "line-through text-muted-foreground" : "text-foreground"
-                      }`}
-                    >
-                      {t.title}
-                    </div>
-                    {t.due && (
-                      <div className="text-[11px] text-muted-foreground mt-0.5">{t.due}</div>
-                    )}
-                  </div>
-                </button>
-              ))}
-              <AddTask onAdd={addTask} />
-            </div>
+            <PlanView
+              scrollRef={scrollRef}
+              tasks={tasks}
+              onToggle={toggleTask}
+              onAdd={addTask}
+            />
           )}
 
           {/* Footer / input */}
@@ -289,5 +269,108 @@ function AddTask({ onAdd }: { onAdd: (title: string) => void }) {
         Add
       </button>
     </form>
+  );
+}
+
+function PlanView({
+  scrollRef,
+  tasks,
+  onToggle,
+  onAdd,
+}: {
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  tasks: Task[];
+  onToggle: (id: string) => void;
+  onAdd: (title: string, bucket: Bucket) => void;
+}) {
+  const [activeBucket, setActiveBucket] = useState<Bucket>("7d");
+
+  const sections: { key: Bucket; label: string; sub: string }[] = [
+    { key: "7d", label: "First 7 days", sub: "Arrival essentials" },
+    { key: "30d", label: "First 30 days", sub: "Settling in" },
+    { key: "custom", label: "Your own", sub: "Anything you've added" },
+  ];
+
+  return (
+    <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+      {sections.map((s) => {
+        const items = tasks.filter((t) => t.bucket === s.key);
+        const done = items.filter((t) => t.done).length;
+        return (
+          <section key={s.key} className="space-y-2">
+            <div className="flex items-baseline justify-between px-1">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">{s.label}</h2>
+                <p className="text-[11px] text-muted-foreground">{s.sub}</p>
+              </div>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {done}/{items.length || 0}
+              </span>
+            </div>
+
+            {items.length === 0 && s.key === "custom" && (
+              <p className="text-xs text-muted-foreground px-1 italic">
+                Add anything Maple suggests in chat.
+              </p>
+            )}
+
+            {items.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => onToggle(t.id)}
+                className="w-full flex items-start gap-3 p-3 rounded-xl border border-border bg-card hover:border-primary/40 transition-colors text-left"
+              >
+                <span
+                  className={`mt-0.5 h-5 w-5 rounded-md border-2 grid place-items-center shrink-0 ${
+                    t.done ? "bg-primary border-primary text-primary-foreground" : "border-border"
+                  }`}
+                >
+                  {t.done && (
+                    <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                      <path
+                        fillRule="evenodd"
+                        d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0L3.3 9.7a1 1 0 011.4-1.4l3.8 3.8 6.8-6.8a1 1 0 011.4 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  )}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div
+                    className={`text-sm leading-snug ${
+                      t.done ? "line-through text-muted-foreground" : "text-foreground"
+                    }`}
+                  >
+                    {t.title}
+                  </div>
+                  {t.note && (
+                    <div className="text-[11px] text-muted-foreground mt-0.5">{t.note}</div>
+                  )}
+                </div>
+              </button>
+            ))}
+          </section>
+        );
+      })}
+
+      <div className="pt-2 border-t border-border">
+        <div className="flex gap-1.5 mb-2">
+          {sections.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setActiveBucket(s.key)}
+              className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${
+                activeBucket === s.key
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card text-muted-foreground border-border hover:border-primary/40"
+              }`}
+            >
+              + {s.label}
+            </button>
+          ))}
+        </div>
+        <AddTask onAdd={(title) => onAdd(title, activeBucket)} />
+      </div>
+    </div>
   );
 }
