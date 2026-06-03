@@ -47,26 +47,7 @@ const STARTERS = [
   "What about health coverage in Quebec?",
 ];
 
-const INITIAL_TASKS: Task[] = [
-  // First 7 days — arrival essentials
-  { id: "d1", bucket: "7d", done: false, title: "Apply for a SIN at Service Canada", note: "Bring passport + study permit" },
-  { id: "d2", bucket: "7d", done: false, title: "Open a student bank account", note: "Most big banks waive fees for students" },
-  { id: "d3", bucket: "7d", done: false, title: "Get a Canadian SIM / phone plan", note: "Prepaid is fine for week one" },
-  { id: "d4", bucket: "7d", done: false, title: "Confirm housing & get keys", note: "Take photos of any damage on day one" },
-  { id: "d5", bucket: "7d", done: false, title: "Buy a transit pass (student fare)", note: "Presto / Compass / OPUS depending on city" },
-  { id: "d6", bucket: "7d", done: false, title: "Stock the kitchen & basics", note: "Grocery run + bedding + adapter" },
-  { id: "d7", bucket: "7d", done: false, title: "Save emergency contacts", note: "School int'l office, 911, embassy" },
-
-  // First 30 days — settling in
-  { id: "m1", bucket: "30d", done: false, title: "Register for the provincial health card", note: "OHIP / RAMQ / MSP — check the wait period" },
-  { id: "m2", bucket: "30d", done: false, title: "Complete on-campus enrolment & orientation", note: "Pick up student ID" },
-  { id: "m3", bucket: "30d", done: false, title: "Set up a credit card to build credit", note: "Student card with no income check" },
-  { id: "m4", bucket: "30d", done: false, title: "Find a family doctor or walk-in clinic", note: "Know where to go before you need it" },
-  { id: "m5", bucket: "30d", done: false, title: "Learn your study permit work rules", note: "On/off-campus hours per IRCC" },
-  { id: "m6", bucket: "30d", done: false, title: "Build a weekly budget", note: "Rent, groceries, transit, phone, savings" },
-  { id: "m7", bucket: "30d", done: false, title: "Join 1 student club or community group", note: "Fastest way to make friends" },
-  { id: "m8", bucket: "30d", done: false, title: "Set up tenant insurance", note: "Usually under $20/month" },
-];
+const INITIAL_TASKS: Task[] = [];
 
 export function MapleApp() {
   const [messages, setMessages] = useState<Message[]>([
@@ -89,7 +70,7 @@ export function MapleApp() {
       if (raw) {
         const s = JSON.parse(raw);
         if (s.messages?.length) setMessages(s.messages);
-        if (s.tasks?.length) setTasks(s.tasks);
+        if (Array.isArray(s.tasks)) setTasks(s.tasks);
       }
     } catch {}
   }, []);
@@ -428,9 +409,11 @@ function PlanView({
               </span>
             </div>
 
-            {items.length === 0 && s.key === "custom" && (
+            {items.length === 0 && (
               <p className="text-xs text-muted-foreground px-1 italic">
-                Add anything Maple suggests in chat.
+                {s.key === "custom"
+                  ? "Add anything Maple suggests in chat."
+                  : "Empty — ask Maple for a plan, then tap “Save as checklist”."}
               </p>
             )}
 
