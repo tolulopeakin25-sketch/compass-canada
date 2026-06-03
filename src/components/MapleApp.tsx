@@ -42,7 +42,7 @@ export function MapleApp() {
     {
       role: "assistant",
       content:
-        "Hi, I'm **Maple** 🍁 — your settlement coach for Canada. Tell me where you've landed and what's on your mind. I'll plan it out with you.",
+        "Hi, I'm Maple 🍁 — your settlement coach for Canada. Tell me where you've landed and what's on your mind. I'll plan it out with you.",
     },
   ]);
   const [input, setInput] = useState("");
