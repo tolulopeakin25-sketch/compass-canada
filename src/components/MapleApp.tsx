@@ -333,6 +333,64 @@ function AddTask({ onAdd }: { onAdd: (title: string) => void }) {
   );
 }
 
+function SaveChecklist({
+  items,
+  onSave,
+}: {
+  items: { title: string; note?: string }[];
+  onSave: (items: { title: string; note?: string }[], bucket: Bucket) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [saved, setSaved] = useState<Bucket | null>(null);
+  const options: { key: Bucket; label: string }[] = [
+    { key: "7d", label: "7-day" },
+    { key: "14d", label: "2-week" },
+    { key: "30d", label: "30-day" },
+    { key: "custom", label: "Custom list" },
+  ];
+  if (saved) {
+    return (
+      <p className="text-[11px] text-muted-foreground mt-1 px-1">
+        Saved {items.length} steps to your Plan ✓
+      </p>
+    );
+  }
+  return (
+    <div className="mt-1.5 px-1 max-w-[85%]">
+      {!open ? (
+        <button
+          onClick={() => setOpen(true)}
+          className="text-xs px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors"
+        >
+          + Save as checklist ({items.length} steps)
+        </button>
+      ) : (
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <span className="text-[11px] text-muted-foreground">Save as:</span>
+          {options.map((o) => (
+            <button
+              key={o.key}
+              onClick={() => {
+                onSave(items, o.key);
+                setSaved(o.key);
+              }}
+              className="text-[11px] px-2.5 py-1 rounded-full border border-border bg-card hover:border-primary/40 text-foreground"
+            >
+              {o.label}
+            </button>
+          ))}
+          <button
+            onClick={() => setOpen(false)}
+            className="text-[11px] px-2 py-1 text-muted-foreground hover:text-foreground"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PlanView({
   scrollRef,
   tasks,
