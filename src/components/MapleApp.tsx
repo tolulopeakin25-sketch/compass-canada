@@ -409,9 +409,11 @@ function PlanView({
               </span>
             </div>
 
-            {items.length === 0 && s.key === "custom" && (
+            {items.length === 0 && (
               <p className="text-xs text-muted-foreground px-1 italic">
-                Add anything Maple suggests in chat.
+                {s.key === "custom"
+                  ? "Add anything Maple suggests in chat."
+                  : "Empty — ask Maple for a plan, then tap “Save as checklist”."}
               </p>
             )}
 
