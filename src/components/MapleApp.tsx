@@ -7,7 +7,7 @@ type Message = { role: "user" | "assistant"; content: string };
 type Bucket = "7d" | "14d" | "30d" | "custom";
 type Task = { id: string; title: string; done: boolean; bucket: Bucket; note?: string };
 
-const STORAGE_KEY = "maple.state.v1";
+const STORAGE_KEY = "maple.state.v2";
 
 // Parse an assistant markdown reply for "### Heading" + "- bullet" pairs.
 // Returns flat list of {title, note} items skipping meta sections like
