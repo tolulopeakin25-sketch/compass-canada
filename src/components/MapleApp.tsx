@@ -271,3 +271,106 @@ function AddTask({ onAdd }: { onAdd: (title: string) => void }) {
     </form>
   );
 }
+
+function PlanView({
+  scrollRef,
+  tasks,
+  onToggle,
+  onAdd,
+}: {
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  tasks: Task[];
+  onToggle: (id: string) => void;
+  onAdd: (title: string, bucket: Bucket) => void;
+}) {
+  const [activeBucket, setActiveBucket] = useState<Bucket>("7d");
+
+  const sections: { key: Bucket; label: string; sub: string }[] = [
+    { key: "7d", label: "First 7 days", sub: "Arrival essentials" },
+    { key: "30d", label: "First 30 days", sub: "Settling in" },
+    { key: "custom", label: "Your own", sub: "Anything you've added" },
+  ];
+
+  return (
+    <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+      {sections.map((s) => {
+        const items = tasks.filter((t) => t.bucket === s.key);
+        const done = items.filter((t) => t.done).length;
+        return (
+          <section key={s.key} className="space-y-2">
+            <div className="flex items-baseline justify-between px-1">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">{s.label}</h2>
+                <p className="text-[11px] text-muted-foreground">{s.sub}</p>
+              </div>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {done}/{items.length || 0}
+              </span>
+            </div>
+
+            {items.length === 0 && s.key === "custom" && (
+              <p className="text-xs text-muted-foreground px-1 italic">
+                Add anything Maple suggests in chat.
+              </p>
+            )}
+
+            {items.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => onToggle(t.id)}
+                className="w-full flex items-start gap-3 p-3 rounded-xl border border-border bg-card hover:border-primary/40 transition-colors text-left"
+              >
+                <span
+                  className={`mt-0.5 h-5 w-5 rounded-md border-2 grid place-items-center shrink-0 ${
+                    t.done ? "bg-primary border-primary text-primary-foreground" : "border-border"
+                  }`}
+                >
+                  {t.done && (
+                    <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                      <path
+                        fillRule="evenodd"
+                        d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0L3.3 9.7a1 1 0 011.4-1.4l3.8 3.8 6.8-6.8a1 1 0 011.4 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  )}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div
+                    className={`text-sm leading-snug ${
+                      t.done ? "line-through text-muted-foreground" : "text-foreground"
+                    }`}
+                  >
+                    {t.title}
+                  </div>
+                  {t.note && (
+                    <div className="text-[11px] text-muted-foreground mt-0.5">{t.note}</div>
+                  )}
+                </div>
+              </button>
+            ))}
+          </section>
+        );
+      })}
+
+      <div className="pt-2 border-t border-border">
+        <div className="flex gap-1.5 mb-2">
+          {sections.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setActiveBucket(s.key)}
+              className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${
+                activeBucket === s.key
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card text-muted-foreground border-border hover:border-primary/40"
+              }`}
+            >
+              + {s.label}
+            </button>
+          ))}
+        </div>
+        <AddTask onAdd={(title) => onAdd(title, activeBucket)} />
+      </div>
+    </div>
+  );
+}
