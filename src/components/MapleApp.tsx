@@ -348,6 +348,7 @@ function PlanView({
 
   const sections: { key: Bucket; label: string; sub: string }[] = [
     { key: "7d", label: "First 7 days", sub: "Arrival essentials" },
+    { key: "14d", label: "First 2 weeks", sub: "Getting set up" },
     { key: "30d", label: "First 30 days", sub: "Settling in" },
     { key: "custom", label: "Your own", sub: "Anything you've added" },
   ];
