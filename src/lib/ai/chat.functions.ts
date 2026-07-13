@@ -66,28 +66,68 @@ export const chatWithMaple = createServerFn({ method: "POST" })
     const baseUrl = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
     const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
 
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          ...data.messages,
-        ],
-      }),
+    const body = JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        ...data.messages,
+      ],
     });
 
+    // Retry 429 (and transient 5xx) with exponential backoff + jitter.
+    // Honors Retry-After when present. Total wait bounded to keep the
+    // server function well under typical request timeouts.
+    const MAX_ATTEMPTS = 4;
+    const BASE_DELAY_MS = 500;
+    const MAX_DELAY_MS = 8000;
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    let res!: Response;
+    let lastErrText = "";
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      res = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body,
+      });
+
+      if (res.ok) break;
+
+      const retriable = res.status === 429 || (res.status >= 500 && res.status < 600);
+      if (!retriable || attempt === MAX_ATTEMPTS - 1) break;
+
+      // Peek body for logging without consuming for the final error branch.
+      lastErrText = await res.text().catch(() => "");
+
+      const retryAfterHeader = res.headers.get("retry-after");
+      let waitMs: number;
+      if (retryAfterHeader) {
+        const asSeconds = Number(retryAfterHeader);
+        waitMs = Number.isFinite(asSeconds)
+          ? asSeconds * 1000
+          : Math.max(0, new Date(retryAfterHeader).getTime() - Date.now());
+      } else {
+        waitMs = Math.min(MAX_DELAY_MS, BASE_DELAY_MS * 2 ** attempt);
+      }
+      // Full jitter
+      waitMs = Math.min(MAX_DELAY_MS, Math.floor(Math.random() * waitMs) + 100);
+
+      console.warn(
+        `OpenAI ${res.status} on attempt ${attempt + 1}/${MAX_ATTEMPTS}, retrying in ${waitMs}ms`,
+      );
+      await sleep(waitMs);
+    }
+
     if (!res.ok) {
-      const text = await res.text().catch(() => "");
+      const text = (await res.text().catch(() => "")) || lastErrText;
       console.error("OpenAI error", res.status, text);
       if (res.status === 429) {
         return {
           error:
-            "OpenAI rejected the request (429). Usually this means the API key has no credits or billing isn't set up. Details: " +
+            "OpenAI is rate-limiting requests (429) after several retries. This usually means the API key has no credits or billing isn't set up. Details: " +
             (text.slice(0, 300) || "no response body"),
         };
       }
