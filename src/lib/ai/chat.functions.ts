@@ -83,14 +83,18 @@ export const chatWithMaple = createServerFn({ method: "POST" })
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
+      console.error("OpenAI error", res.status, text);
       if (res.status === 429) {
-        return { error: "Maple is getting a lot of questions right now. Try again in a moment." };
+        return {
+          error:
+            "OpenAI rejected the request (429). Usually this means the API key has no credits or billing isn't set up. Details: " +
+            (text.slice(0, 300) || "no response body"),
+        };
       }
-      if (res.status === 402) {
-        return { error: "AI credits exhausted. Please top up your Lovable workspace." };
+      if (res.status === 401) {
+        return { error: "OpenAI rejected the API key (401). Check OPENAI_API_KEY is valid." };
       }
-      console.error("AI gateway error", res.status, text);
-      return { error: "Something went wrong reaching the assistant." };
+      return { error: `OpenAI error ${res.status}: ${text.slice(0, 300) || "no body"}` };
     }
 
     const json = await res.json();
