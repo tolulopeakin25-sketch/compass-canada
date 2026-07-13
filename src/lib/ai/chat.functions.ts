@@ -81,19 +81,36 @@ export const chatWithMaple = createServerFn({ method: "POST" })
       }),
     });
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      if (res.status === 429) {
-        return { error: "Maple is getting a lot of questions right now. Try again in a moment." };
-      }
-      if (res.status === 402) {
-        return { error: "AI credits exhausted. Please top up your Lovable workspace." };
-      }
-      console.error("AI gateway error", res.status, text);
-      return { error: "Something went wrong reaching the assistant." };
-    }
+   if (!res.ok) {
+  const text = await res.text().catch(() => "");
 
-    const json = await res.json();
-    const reply: string = json.choices?.[0]?.message?.content ?? "";
-    return { reply };
+  // Logs the actual OpenAI error in Vercel.
+  console.error("OpenAI API error", {
+    status: res.status,
+    body: text,
+  });
+
+  if (res.status === 429) {
+    return {
+      error:
+        "Maple cannot answer right now because the AI account has reached a usage or rate limit.",
+    };
+  }
+
+  if (res.status === 401) {
+    return {
+      error: "The AI service could not authenticate. Please check the API key.",
+    };
+  }
+
+  if (res.status === 403) {
+    return {
+      error: "The AI service denied access to this request.",
+    };
+  }
+
+  return {
+    error: "Something went wrong reaching the assistant.",
+  };
+}
   });
