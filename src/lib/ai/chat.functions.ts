@@ -58,19 +58,22 @@ export const chatWithMaple = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+      return { error: "OPENAI_API_KEY is not configured on the server." };
     }
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const baseUrl = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
+    const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+
+    const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "openai/gpt-5-mini",
+        model,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           ...data.messages,
